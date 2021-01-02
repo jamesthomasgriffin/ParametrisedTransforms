@@ -15,7 +15,7 @@ struct TreeParameters {
     float right_scale_factor;
 };
 
-void create_tree(ImGui::Draggable2DView& view, TreeParameters* params, int depth, int LR, ImGui::ControlPointFlags flags)
+void create_tree(ImGui::Draggable2DView& view, TreeParameters* params, int depth, int LR, ImGuiControlPointFlags flags)
 {
     if (depth <= 0)
         return;
@@ -75,9 +75,9 @@ void ShowTreeDemo(bool* p_open)
     static ImGui::Draggable2DView view{};
     if (view.begin("tree_view", ImVec2{ 300, 400 }, ImVec4(0, 0, 0, 1)))
     {
-        ImGui::ControlPointFlags flags = ImGui::ControlPointFlags_DeferParameterChangeToEnd;
+        ImGuiControlPointFlags flags = 0;
         if (draw_markers)
-            flags |= ImGui::ControlPointFlags_DrawControlPointMarkers;
+            flags |= ImGuiControlPointFlags_DrawControlPointMarkers;
 
         view.pushScale(-1.0f);
         view.pushTranslationAlongY(-0.8f);
@@ -142,7 +142,7 @@ void ShowSpiralDemo(bool* p_open)
         view.pushScaleX(0.0f);
         view.pushScaleY(0.0f);
 
-        ImGui::ControlPointFlags flags = ImGui::ControlPointFlags_DrawControlPointMarkers;
+        ImGuiControlPointFlags flags = ImGuiControlPointFlags_DrawControlPointMarkers;
         view.controlPoint({ 1.0, 0.0, 0.0, 1.0 }, &spiral_height, flags, 0, 0.2f, ImVec4(0, 1, 0, 1));
 
         view.clearTransforms();
@@ -153,6 +153,135 @@ void ShowSpiralDemo(bool* p_open)
     ImGui::Selectable("Some text to make sure we haven't broken anything", selected);
 
     ImGui::End();
+}
+
+void ShowSpiralDemo2(bool* p_open)
+{
+    ImGui::Begin("Spiral Demo", p_open);
+
+    static float y_angle = 0.3f;
+    static float spiral_rotation = 0.2f;
+    static float spiral_height = 0.01f;
+    static float spiral_scale = 0.9f;
+    static int spiral_length = 20;
+
+    ImGui::SliderFloat("spiral rotation", &spiral_rotation, -3.1416f, 3.1416f);
+    ImGui::SliderFloat("spiral height", &spiral_height, -0.1f, 0.1f);
+    ImGui::SliderFloat("spiral scale", &spiral_scale, 0.7f, 1.1f);
+    ImGui::SliderInt("number of points", &spiral_length, 2, 100);
+
+    if (ImGui::BeginControlPointView("some_label_for_id", ImVec2(300, 300), ImVec4(0, 1, 1, 1)))
+    {
+        ImGui::PushPerspectiveMatrix(45.0f / 180.f * 3.14159f, 1.0f, 0.01f, 10.0f);
+        ImGui::PushLookAtMatrix(
+            { 2.5f, 0.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }
+        );
+        ImGui::PushRotationAboutY(&y_angle);
+
+        auto draw_list = ImGui::GetWindowDrawList();
+        ImGui::ControlPoint({ 1.0, 0.0, 0.0, 1.0 }, 0, 0, 0.05f, ImVec4{ 0, 1, 1, 1 });
+        ImVec2 prev_point = ImGui::GetLastControlPointPosition();
+        for (int i = 0; i < spiral_length; ++i)
+        {
+            ImGui::PushRotationAboutZ(&spiral_rotation);
+            ImGui::PushTranslationAlongZ(&spiral_height);
+            ImGui::PushScaleX(&spiral_scale);
+            ImGui::PushScaleY(&spiral_scale);
+            ImGui::ControlPoint({ 1.0, 0.0, 0.0, 1.0 }, &spiral_rotation, &spiral_scale, 0, 0, 0.05f, ImVec4(1, 0, 0, 1));
+            ImVec2 current_point = ImGui::GetLastControlPointPosition();
+            draw_list->PathLineTo(prev_point);
+            draw_list->PathLineTo(current_point);
+            draw_list->PathStroke(ImGui::GetColorU32({ 1.0, 0.0, 0.0, 1.0 }), false, 2.0f);
+            prev_point = current_point;
+        }
+        draw_list->PathStroke(ImGui::GetColorU32({ 1.0, 0.0, 0.0, 1.0 }), false);
+        ImGui::PushTranslationAlongZ(0.1f);
+        ImGui::PushScaleX(0.0f);
+        ImGui::PushScaleY(0.0f);
+
+        ImGuiControlPointFlags flags = ImGuiControlPointFlags_DrawControlPointMarkers;
+        ImGui::ControlPoint({ 1.0, 0.0, 0.0, 1.0 }, &spiral_height, flags, 0, 0.05f, ImVec4(0, 1, 0, 1));
+
+        ImGui::ClearTransforms();
+        ImGui::EndControlPointView();
+    }
+
+    bool selected = false;
+    ImGui::Selectable("Some text to make sure we haven't broken anything", selected);
+
+    ImGui::End();
+}
+
+void ShowArmDemo(bool* p_open)
+{
+    ImGui::Begin("Arm Demo", p_open);
+
+    static float base_rotation = 0.0f;
+    static float base_angle = 0.1f;
+    static float elbow_angle = 0.2f;
+
+    ImGuiControlPointFlags flags = ImGuiControlPointFlags_DrawControlPointMarkers;
+    flags |= ImGuiControlPointFlags_DrawParamDerivatives;
+
+    ImGui::BeginControlPointView("arm", { 400, 400 }, { 1, 1, 1, 1 });
+    ImGui::PushPerspectiveMatrix(45.0f / 180.0f * 3.14159f, 1.0f, 0.01f, 10.0f);
+    ImGui::PushLookAtMatrix({ 0.0f, 0.5f, -2.0f }, {}, { 0, -1, 0 });
+    ImGui::PushTranslationAlongY(-0.5f);
+    ImGui::PushRotationAboutY(&base_rotation);
+    ImGui::ControlPoint({ 0.2f, 0, 0, 1.0f }, &base_rotation, flags, 0, 0.025f, { 1, 0, 1, 1 });
+    ImGui::ControlPoint({ 0.0f, 0, 0, 1.0f }, flags, 0, 0.025f, { 1, 1, 1, 1 });
+    ImGui::PushRotationAboutZ(&base_angle);
+    ImGui::PushTranslationAlongY(0.5f);
+    ImGui::ControlPoint({ 0.0f, -0.1f, 0, 1.0f }, &base_angle, flags, 0, 0.025f, { 1, 1, 1, 1 });
+    ImGui::ControlPoint({ 0.0f, -0.2f, 0, 1.0f }, &base_angle, flags, 0, 0.025f, { 1, 1, 1, 1 });
+    ImGui::ControlPoint({ 0.0f, -0.3f, 0, 1.0f }, &base_angle, flags, 0, 0.025f, { 1, 1, 1, 1 });
+    ImGui::ControlPoint({ 0.0f, -0.4f, 0, 1.0f }, &base_angle, flags, 0, 0.025f, { 1, 1, 1, 1 });
+    ImGui::ControlPoint({ 0.0f, 0, 0, 1.0f }, &base_angle, flags, 0, 0.1f, { 1, 1, 1, 1 });
+    ImGui::PushRotationAboutZ(&elbow_angle);
+    ImGui::PushTranslationAlongY(0.4f);
+    ImGui::ControlPoint({ 0.0f, -0.1f, 0, 1.0f }, &elbow_angle, flags, 0, 0.025f, { 1, 1, 0, 1 });
+    ImGui::ControlPoint({ 0.0f, -0.2f, 0, 1.0f }, &elbow_angle, flags, 0, 0.025f, { 1, 1, 0, 1 });
+    ImGui::ControlPoint({ 0.0f, -0.3f, 0, 1.0f }, &elbow_angle, flags, 0, 0.025f, { 1, 1, 0, 1 });
+    ImGui::ControlPoint({ 0.0f, 0, 0, 1.0f }, &elbow_angle, &base_angle, flags, 0, 0.0375f, { 1, 0, 0, 1 });
+
+    ImGui::ClearTransforms();
+    ImGui::EndControlPointView();
+
+    elbow_angle = clamp(elbow_angle, 0.3f, 2.8f);
+    base_angle = clamp(base_angle, 0.1f, 1.4f);
+
+    ImGui::End();
+}
+
+void ShowTranslationWidgetDemo(bool* p_open)
+{
+    static ImMat4 model_matrix{
+        {1, 0, 0, 0},
+        {0, 1, 0, 0},
+        {0, 0, 1, 0},
+        {0, 0, 0, 1}
+    };
+    
+    ImGui::Begin("Translation Widget", p_open);
+
+    if (ImGui::BeginControlPointView("translation", { 300, 300 }, { 1, 1, 1, 1 }))
+    {
+        ImGui::PushPerspectiveMatrix(45.0f / 180.0f * 3.14159f, 1.0f, 0.01f, 10.0f);
+        ImGui::PushLookAtMatrix({ 0.0f, 0.25f, -1.0f }, {}, { 0, -1, 0 });
+
+        // Draw our control points
+        ImGuiControlPointFlags flags = ImGuiControlPointFlags_DrawControlPointMarkers;
+        ImGui::TranslationWidget(&model_matrix, 0.1f, flags, true);
+
+        ImGui::PopTransform();
+        ImGui::PopTransform();
+        ImGui::EndControlPointView();
+    }
+    if (ImGui::Button("Reset Position")) {
+        model_matrix.col4 = { 0, 0, 0, 1 };
+    }
+    ImGui::End();
+
 }
 
 void ShowCameraDemo(bool* p_open)
@@ -173,8 +302,8 @@ void ShowCameraDemo(bool* p_open)
 
     if (view.begin("camera", ImVec2(400, 300), ImVec4(0, 1, 1, 1)))
     {
-        ImGui::ControlPointFlags flags = show_parameter_derivatives ? ImGui::ControlPointFlags_DrawParameterDerivatives : 0;
-        flags |= ImGui::ControlPointFlags_DrawControlPointMarkers;
+        ImGuiControlPointFlags flags = show_parameter_derivatives ? ImGuiControlPointFlags_DrawParamDerivatives : 0;
+        flags |= ImGuiControlPointFlags_DrawControlPointMarkers;
 
         view.pushPerspectiveMatrix(45.0f / 180.f * 3.14159f, 4.0f / 3, 0.01f, 10.0f);  // projection matrix
 

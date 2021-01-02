@@ -5,3 +5,8 @@
 void ShowTreeDemo(bool*);
 void ShowCameraDemo(bool*);
 void ShowSpiralDemo(bool*);
+void ShowSpiralDemo2(bool*);
+
+void ShowArmDemo(bool*);
+
+void ShowTranslationWidgetDemo(bool*);
