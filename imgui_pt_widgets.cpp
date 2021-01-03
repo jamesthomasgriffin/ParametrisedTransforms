@@ -722,8 +722,6 @@ namespace ImGui
         // We don't change any parameters in the control points, instead wait until the deferral slot is popped
         ImGui::PushDeferralSlot();
 
-        control_point_flags |= ImGuiControlPointFlags_Circular;
-        
         ImGui::ControlPoint(M->col4, control_point_flags, 0, 0.025f, { 1, 1, 1, 1 });
         ImGui::ControlPoint(*M * ImVec4{ axes_size, 0, 0, 1 }, &t.x, control_point_flags, 0, 0.025f, { 1, 0, 0, 1 });
         ImGui::ControlPoint(*M * ImVec4{ 0, axes_size, 0, 1 }, &t.y, control_point_flags, 0, 0.025f, { 0, 1, 0, 1 });
@@ -735,9 +733,9 @@ namespace ImGui
             ImGui::ControlPoint(*M * ImVec4{ axes_size / 2, 0, axes_size / 2, 1 }, &t.z, &t.x, control_point_flags, 0, 0.02f, { 1, 0, 1, 1 });
         }
 
-        ImGui::PopTransform();
-        ImGui::PopTransform();
-        ImGui::PopTransform();
+        ImGui::PopTransform();  // Z-translation
+        ImGui::PopTransform();  // Y-translation
+        ImGui::PopTransform();  // X-translation
 
         // This will apply any changes made to t as intended, without the unintended consequence of
         // applying any previously made changes.
