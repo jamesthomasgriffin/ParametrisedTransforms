@@ -37,6 +37,9 @@ namespace ImGui {
 	void PushDeferralSlot();
 	void PopDeferralSlot();
 
+	ImVec2 GetControlPointViewBoundsMin();
+	ImVec2 GetControlPointViewBoundsMax();
+
 	ImVec2 GetLastControlPointPosition();
 	float GetLastControlPointRadius();
 
@@ -97,6 +100,8 @@ namespace ImGui {
 		void pushDeferralSlot();
 		void popDeferralSlot();
 
+		ImVec2 getViewBoundsMin() const;
+		ImVec2 getViewBoundsMax() const;
 		ImVec2 const& getLastControlPointPosition() const { return m_last_control_point_position; }
 		float getLastControlPointRadius() const { return m_last_control_point_radius; }
 		float const& getLastParameterStep(size_t ix) const { return m_last_step[ix].change; }

@@ -199,6 +199,16 @@ namespace ImGui
         --m_deferral_stack_size;
     }
 
+    ImVec2 DraggableView::getViewBoundsMin() const
+    {
+        return GetCurrentWindow()->ClipRect.Max;
+    }
+
+    ImVec2 DraggableView::getViewBoundsMax() const
+    {
+        return GetCurrentWindow()->ClipRect.Min;
+    }
+
     void DraggableView::drawDerivative(ImVec2 const& pos, ImVec2 const& d, ImVec4 const& col, float thickness) const
     {
         ImDrawList* draw_list = GetWindowDrawList();
@@ -628,6 +638,16 @@ namespace ImGui
     void PopDeferralSlot()
     {
         g_current_context.popDeferralSlot();
+    }
+
+    ImVec2 GetControlPointViewBoundsMin()
+    {
+        return g_current_context.getViewBoundsMin();
+    }
+
+    ImVec2 GetControlPointViewBoundsMax()
+    {
+        return g_current_context.getViewBoundsMax();
     }
 
     ImVec2 GetLastControlPointPosition() {
