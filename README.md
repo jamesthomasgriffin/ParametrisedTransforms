@@ -2,6 +2,8 @@
 
 A small template header library for parametrised transforms, with examples for Dear ImGui.
 
+![arm demo](https://user-images.githubusercontent.com/2971239/103889425-51301700-50de-11eb-8e90-e20fde6e0885.gif)
+
 Read the source files for documentation.  To run the demos start with your chosen Dear ImGui implementation example and call each of the three declared functions immediately before or after the ShowDemo function call.
 
 If you have any questions about the code then please contact me or raise an issue.  Furthermore if you have any suggestions for transforms you want included then again raise an issue.  Contributions to the code are of course welcome.
