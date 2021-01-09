@@ -46,10 +46,12 @@ namespace ImGui {
 	bool ControlPoint(ImVec2 const& pos, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col, float z_order);
 	bool ControlPoint(ImVec2 const& pos, float* free_parameter, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col, float z_order);
 	bool ControlPoint(ImVec2 const& pos, float* free_parameter1, float* free_parameter2, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col, float z_order);
+	bool ControlPoint(ImVec2 const& pos, float* free_parameter1, float* free_parameter2, float* free_parameter3, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col, float z_order);
 	
 	bool ControlPoint(ImVec4 const& pos, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col);
 	bool ControlPoint(ImVec4 const& pos, float* free_parameter, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col);
 	bool ControlPoint(ImVec4 const& pos, float* free_parameter1, float* free_parameter2, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col);
+	bool ControlPoint(ImVec4 const& pos, float* free_parameter1, float* free_parameter2, float* free_parameter3, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col);
 
 
 	void PushMatrix(ImMat4 const& M);  // 3d case
@@ -133,7 +135,7 @@ namespace ImGui {
 			float* parameter{ nullptr };
 			float change{ 0 };
 		};
-		typedef std::array<ParameterChange, 2> SavedParameterChanges;
+		typedef std::array<ParameterChange, 3> SavedParameterChanges;
 		SavedParameterChanges m_last_step{};
 
 		// We use the language of a stack of deferrals, but since there is only one change per frame it
@@ -155,6 +157,8 @@ namespace ImGui {
 		bool controlPoint(ImVec2 const& pos, float* free_param,
 			ImGuiControlPointFlags flags = 0, ImGuiButtonFlags button_flags = 0, float marker_radius = 0.1f, ImVec4 marker_col = { 1, 1, 1, 1 }, float z_order = 0);
 		bool controlPoint(ImVec2 const& pos, float* free_param1, float* free_param2,
+			ImGuiControlPointFlags flags = 0, ImGuiButtonFlags button_flags = 0, float marker_radius = 0.1f, ImVec4 marker_col = { 1, 1, 1, 1 }, float z_order = 0);
+		bool controlPoint(ImVec2 const& pos, float* free_param1, float* free_param2, float* free_param3,
 			ImGuiControlPointFlags flags = 0, ImGuiButtonFlags button_flags = 0, float marker_radius = 0.1f, ImVec4 marker_col = { 1, 1, 1, 1 }, float z_order = 0);
 
 		template<unsigned int D>
@@ -196,7 +200,9 @@ namespace ImGui {
 			ImGuiControlPointFlags flags = 0, ImGuiButtonFlags button_flags = 0, float marker_radius = 0.1f, ImVec4 marker_col = { 1, 1, 1, 1 });
 		bool controlPoint(ImVec4 const& pos, float* free_param, 
 			ImGuiControlPointFlags flags = 0, ImGuiButtonFlags button_flags = 0, float marker_radius = 0.1f, ImVec4 marker_col = { 1, 1, 1, 1 });
-		bool controlPoint(ImVec4 const& pos, float* free_param1, float* free_param2, 
+		bool controlPoint(ImVec4 const& pos, float* free_param1, float* free_param2,
+			ImGuiControlPointFlags flags = 0, ImGuiButtonFlags button_flags = 0, float marker_radius = 0.1f, ImVec4 marker_col = { 1, 1, 1, 1 });
+		bool controlPoint(ImVec4 const& pos, float* free_param1, float* free_param2, float* free_param3,
 			ImGuiControlPointFlags flags = 0, ImGuiButtonFlags button_flags = 0, float marker_radius = 0.1f, ImVec4 marker_col = { 1, 1, 1, 1 });
 
 		template<unsigned int D>

@@ -72,6 +72,13 @@ static inline ImVec4 operator*(ImMat4 const& A, ImVec4 const& v) {
     return A.col1 * v.x + A.col2 * v.y + A.col3 * v.z + A.col4 * v.w;
 }
 
+namespace {
+    // The templated code in ParametrisedTransforms.h requires these functions for its scalars
+    inline float sqrt(float a) { return sqrtf(a); }
+    inline float cos(float a) { return cosf(a); }
+    inline float sin(float a) { return sinf(a); }
+}
+
 
 namespace ImGui
 {
@@ -152,9 +159,11 @@ namespace ImGui
         active = false;
 
         {   // Set the Dear ImGui state to where it should be after the view widget
-            ImGui::SetCursorScreenPos(m_final_cursor_pos);
-
+            //ImGui::SetCursorScreenPos(m_final_cursor_pos);
             PopClipRect();
+
+            ImGui::SetCursorScreenPos(m_initial_cursor_pos);
+            ImGui::InvisibleButton("view", m_size);
 
             if (m_saved_control_point_id)
                 SetActiveID(m_saved_control_point_id, GetCurrentWindow());
@@ -201,12 +210,12 @@ namespace ImGui
 
     ImVec2 DraggableView::getViewBoundsMin() const
     {
-        return GetCurrentWindow()->ClipRect.Max;
+        return m_initial_cursor_pos;
     }
 
     ImVec2 DraggableView::getViewBoundsMax() const
     {
-        return GetCurrentWindow()->ClipRect.Min;
+        return m_initial_cursor_pos + m_size;
     }
 
     void DraggableView::drawDerivative(ImVec2 const& pos, ImVec2 const& d, ImVec4 const& col, float thickness) const
@@ -262,7 +271,8 @@ namespace ImGui
             return false;
         }
 
-        bool cp_activated = false;            
+        bool cp_activated = false;
+        bool result{};
 
         {   // Create invisible button at marker and return cursor to its original position
             char buf[32];
@@ -272,7 +282,7 @@ namespace ImGui
             SetCursorScreenPos(marker_bb.Min);
 
             // Use an invisible button to handle hovering / clicking / dragging
-            InvisibleButton(buf, marker_size, button_flags);
+            result = InvisibleButton(buf, marker_size, button_flags);
 
             SetItemAllowOverlap();
 
@@ -318,7 +328,7 @@ namespace ImGui
                     GetWindowDrawList()->AddRect(marker_bb.Min, marker_bb.Max, GetColorU32(marker_col), 0.0f);
             }
         }
-        return IsItemActive();
+        return result;
     }
 
     bool DraggableView::saveControlPoint(float z_order)
@@ -409,6 +419,11 @@ namespace ImGui
         return controlPoint<2>(pos, { free_param1, free_param2 }, flags, button_flags, marker_radius, marker_col, importance);
     }
 
+    bool Draggable2DView::controlPoint(ImVec2 const& pos, float* free_param1, float* free_param2, float* free_param3, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col, float importance)
+    {
+        return controlPoint<3>(pos, { free_param1, free_param2, free_param3 }, flags, button_flags, marker_radius, marker_col, importance);
+    }
+
     template<unsigned int D>
     bool Draggable2DView::controlPoint(ImVec2 const& pos, std::array<float*, D> free_parameters, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col, float importance)
     {
@@ -427,7 +442,8 @@ namespace ImGui
             importance = 0.0001f;
 
         // We want the control point to move the marker if it is the only one active (multiple can only be active at first activation)
-        if (createControlPoint(screen_coords, flags, button_flags, marker_width, marker_col, 1.0 / importance) && IsItemActive() && !IsItemActivated())
+        bool result = createControlPoint(screen_coords, flags, button_flags, marker_width, marker_col, 1.0f / importance);
+        if (IsItemActive() && !IsItemActivated())
         {
             ImVec2 mouse_pos = getMouseInViewCoords();
 
@@ -441,10 +457,8 @@ namespace ImGui
                 for (auto const& d : jet.derivatives)
                     drawDerivative(pos, { d[0], d[1] }, marker_col);
             }
-
-            return true;
         }
-        return false;
+        return result;
     }
 
     void Draggable2DView::pushMatrix(ImMat2 const& M) { m_transforms.pushMatrix(M); }
@@ -521,6 +535,11 @@ namespace ImGui
         return controlPoint<2>(pos, { free_param1, free_param2 }, flags, button_flags, marker_radius, marker_col);
     }
 
+    bool Draggable3DView::controlPoint(ImVec4 const& pos, float* free_param1, float* free_param2, float* free_param3, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col)
+    {
+        return controlPoint<3>(pos, { free_param1, free_param2, free_param3 }, flags, button_flags, marker_radius, marker_col);
+    }
+
     void Draggable3DView::pushMatrix(ImMat4 const& M) { m_transforms.pushMatrix(M); }
 
     void Draggable3DView::pushPerspectiveMatrix(float fov, float aspect_ratio, float z_near, float z_far)
@@ -593,29 +612,28 @@ namespace ImGui
         if(!(flags & ImGuiControlPointFlags_FixedSize))
             marker_width /= (transformed_pos.w);
 
-        if (createControlPoint(screen_coords, flags, button_flags, marker_width, marker_col, z)) {
-            if ((D > 0) && IsItemActive() && !IsItemActivated()) 
-            {
-                ImVec2 mouse_pos = getMouseInViewCoords();
-                ImVec4 mouse_in_view_coords{ mouse_pos[0], mouse_pos[1], transformed_pos.z / transformed_pos.w, 1.0f };
-                
-                bringTogether(pos, mouse_in_view_coords, free_parameters, flags);
+        bool result = createControlPoint(screen_coords, flags, button_flags, marker_width, marker_col, z);
+        if ((D > 0) && IsItemActive() && !IsItemActivated())
+        {
+            ImVec2 mouse_pos = getMouseInViewCoords();
+            //ImVec4 mouse_in_view_coords{ mouse_pos[0], mouse_pos[1], transformed_pos.z / transformed_pos.w, 1.0f };
+            ImVec4 mouse_in_view_coords{ mouse_pos[0], mouse_pos[1], m_saved_control_point_z_value, 1.0f };
 
-                if (flags & ImGuiControlPointFlags_DrawParamDerivatives) 
-                {
-                    // Draw tangent vector(s)
-                    ProjectionTransform<float, ImVec4, 3> projection{};
-                    JetDeg1<ImVec4, float*, D> jet = projection.applyStaticallyTo1Jet<D>(0,
-                        m_transforms.applyTo1Jet<D>(JetDeg1<ImVec4, float*, D>{ free_parameters, pos })
-                        );
-                    ImVec2 pos{ jet.position[0], jet.position[1] };
-                    for (auto const& d : jet.derivatives)
-                        drawDerivative(pos, { d[0], d[1] }, marker_col);
-                }
-                return true;
+            bringTogether(pos, mouse_in_view_coords, free_parameters, flags);
+
+            if (flags & ImGuiControlPointFlags_DrawParamDerivatives)
+            {
+                // Draw tangent vector(s)
+                ProjectionTransform<float, ImVec4, 3> projection{};
+                JetDeg1<ImVec4, float*, D> jet = projection.applyStaticallyTo1Jet<D>(0,
+                    m_transforms.applyTo1Jet<D>(JetDeg1<ImVec4, float*, D>{ free_parameters, pos })
+                    );
+                ImVec2 pos{ jet.position[0], jet.position[1] };
+                for (auto const& d : jet.derivatives)
+                    drawDerivative(pos, { d[0], d[1] }, marker_col);
             }
         }
-        return false;
+        return result;
     }
 
     Draggable3DView g_current_context{};
@@ -666,9 +684,13 @@ namespace ImGui
     {
         return g_current_context.controlPoint({ pos.x, pos.y, z_order, 1 }, free_parameter1, free_parameter2, flags, button_flags, marker_radius, marker_col);
     }
+    bool ControlPoint(ImVec2 const& pos, float* free_parameter1, float* free_parameter2, float* free_parameter3, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col, float z_order)
+    {
+        return g_current_context.controlPoint({ pos.x, pos.y, z_order, 1 }, free_parameter1, free_parameter2, free_parameter3, flags, button_flags, marker_radius, marker_col);
+    }
     bool ControlPoint(ImVec2 const& pos, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col, float z_order)
     {
-        return g_current_context.controlPoint({pos.x, pos.y, z_order, 1}, flags, button_flags, marker_radius, marker_col);
+        return g_current_context.controlPoint({ pos.x, pos.y, z_order, 1 }, flags, button_flags, marker_radius, marker_col);
     }
 
     bool ControlPoint(ImVec4 const& pos, float* free_parameter, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col)
@@ -678,6 +700,10 @@ namespace ImGui
     bool ControlPoint(ImVec4 const& pos, float* free_parameter1, float* free_parameter2, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col)
     {
         return g_current_context.controlPoint(pos, free_parameter1, free_parameter2, flags, button_flags, marker_radius, marker_col);
+    }
+    bool ControlPoint(ImVec4 const& pos, float* free_parameter1, float* free_parameter2, float* free_parameter3, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col)
+    {
+        return g_current_context.controlPoint(pos, free_parameter1, free_parameter2, free_parameter3, flags, button_flags, marker_radius, marker_col);
     }
     bool ControlPoint(ImVec4 const& pos, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col)
     {
