@@ -158,28 +158,33 @@ namespace ImGui
 
         active = false;
 
-        {   // Set the Dear ImGui state to where it should be after the view widget
-            //ImGui::SetCursorScreenPos(m_final_cursor_pos);
-            PopClipRect();
-
-            ImGui::SetCursorScreenPos(m_initial_cursor_pos);
-            ImGui::InvisibleButton("view", m_size);
-
-            if (m_saved_control_point_id)
-                SetActiveID(m_saved_control_point_id, GetCurrentWindow());
-        }
-
-        // Reset the saved control point, NB z-position does not need reseting
-        m_saved_control_point_id = 0;
+        bool parameters_updated = false;
 
         // If there is a change in the deferral stack then apply it
         if (m_deferred_step_position >= 0)
-            updateParameters(m_deferred_step);
+            parameters_updated = applyParameterChanges(m_deferred_step);
 
         // Reset deferral stack state
         m_deferral_stack_size = 1;
         m_deferred_step_position = -1;
         m_deferred_step = {};
+
+        if (m_saved_control_point_id)
+            SetActiveID(m_saved_control_point_id, GetCurrentWindow());
+
+        if (parameters_updated)
+            MarkItemEdited(GetActiveID());
+
+        // Reset the saved control point, NB z-position does not need reseting
+        m_saved_control_point_id = 0;
+
+        // Set the Dear ImGui state to where it should be after the view widget
+        //ImGui::SetCursorScreenPos(m_final_cursor_pos);
+        PopClipRect();
+
+        ImGui::SetCursorScreenPos(m_initial_cursor_pos);
+        ImGui::InvisibleButton("view", m_size);
+
     }
 
     void DraggableView::pushDeferralSlot()
@@ -189,23 +194,26 @@ namespace ImGui
         ++m_deferral_stack_size;
     }
 
-    void DraggableView::popDeferralSlot()
+    bool DraggableView::popDeferralSlot()
     {
         if (!active)
-            return;
+            return false;
 
         IM_ASSERT(m_deferral_stack_size > 0);  // We shouldn't pop an empty stack
+
+        bool change_applied = false;
 
         // If there is a change at the top of the stack then apply it
         if (m_deferred_step_position + 1 == m_deferral_stack_size)
         {
-            updateParameters(m_deferred_step);
+            change_applied = applyParameterChanges(m_deferred_step);
             m_deferred_step = {};
             m_deferred_step_position = -1;
         }
 
         // Reduce the size
         --m_deferral_stack_size;
+        return change_applied;
     }
 
     ImVec2 DraggableView::getViewBoundsMin() const
@@ -298,7 +306,6 @@ namespace ImGui
                     {
                         cp_activated = false;
                         ClearActiveID();
-                            
                     }
                 }
             }
@@ -342,25 +349,45 @@ namespace ImGui
         return true;
     }
 
-    void DraggableView::updateParameters(SavedParameterChanges const& changes)
+    bool DraggableView::applyParameterChanges(SavedParameterChanges const& changes)
     {
-        updateParameters(changes, ImGuiControlPointFlags_ApplyParamChangesImmediately);
+        bool has_changed = false;
+
+        for (auto const& change : changes) {
+            if (change.change && change.parameter)
+            {
+                *(change.parameter) += change.change;
+                has_changed = true;
+            }
+        }
+        return has_changed;
     }
 
-    void DraggableView::updateParameters(SavedParameterChanges const& changes, ImGuiControlPointFlags const& flags)
+    bool DraggableView::updateParameters(SavedParameterChanges const& changes, ImGuiControlPointFlags const& flags)
     {
         m_last_step = changes;
-        if (!(flags & ImGuiControlPointFlags_ApplyParamChangesImmediately)) {
+
+        if (flags & ImGuiControlPointFlags_DoNotChangeParams)
+            return false;
+
+        if (flags & ImGuiControlPointFlags_ApplyParamChangesImmediately) 
+        {
+            bool change_applied = applyParameterChanges(changes);
+            if (change_applied)
+            {
+                IM_ASSERT(IsItemActive());  // If we are making parameter changes immediately the previous item must be active and marking it as edited makes sense
+                MarkItemEdited(GetItemID());
+            }
+            return change_applied;
+        }
+        else
+        {
             IM_ASSERT(m_deferral_stack_size > 0);  // There should be a slot in which to place our deferred changes
             m_deferred_step = changes;
             m_deferred_step_position = m_deferral_stack_size - 1;  // Step is at the end of the stack
+            return false;
         }
-        else if (!(flags & ImGuiControlPointFlags_DoNotChangeParams)) {
-            for (auto const& change : changes) {
-                if (change.parameter)
-                    *(change.parameter) += change.change;
-            }
-        }
+        return false;
     }
 
 
@@ -372,7 +399,7 @@ namespace ImGui
     }
 
     template<unsigned int D>
-    void Draggable2DView::bringTogether(ImVec2 pos, ImVec2 p, std::array<float*, D> const& free_parameters, ImGuiControlPointFlags const& flags)
+    bool Draggable2DView::bringTogether(ImVec2 pos, ImVec2 p, std::array<float*, D> const& free_parameters, ImGuiControlPointFlags const& flags)
     {
         /*
         Minimises Q = |p - transform(pos)|^2 over the set of D parameters.
@@ -380,9 +407,7 @@ namespace ImGui
         so we use the Newton-Raphson method on the derivative to update the parameters.
         */
 
-        // D is the number of parameters, there is nothing to do if D is zero
-        if (D == 0)
-            return;
+        assert(D > 0);
 
         // Rather than directly apply the change from the Newton-Raphson method, first multiply
         // by this factor, slower convergence but smoother and less likely to jitter around
@@ -401,12 +426,26 @@ namespace ImGui
         for (int i = 0; i < D; ++i) {
             changes[i] = { free_parameters[i], -softening_factor * steps[i] };
         }
-        updateParameters(changes, flags);
+        return updateParameters(changes, flags);
     }
 
-    bool Draggable2DView::controlPoint(ImVec2 const& pos, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col, float importance)
+    bool Draggable2DView::staticControlPoint(ImVec2 const& pos, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col, float importance)
     {
-        return controlPoint<0>(pos, {}, flags, button_flags, marker_radius, marker_col, importance);
+        if (!active)  // We cannot add a control point to a view that hasn't been started
+            return false;
+
+        ImVec2 transformed_pos = m_transforms.applyToVector(pos);
+        ImVec2 screen_coords = viewCoordsToScreenCoords({ transformed_pos[0], transformed_pos[1] });
+
+        // Calculate marker size in pixels, using w coord to scale the size
+        float marker_width = 2 * marker_radius;
+        if (!(flags & ImGuiControlPointFlags_SizeInPixels))
+            marker_width *= m_size.x;
+
+        if (importance <= 0)
+            importance = 0.0001f;
+
+        return createControlPoint(screen_coords, flags, button_flags, marker_width, marker_col, 1.0f / importance);
     }
 
     bool Draggable2DView::controlPoint(ImVec2 const& pos, float* free_param, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col, float importance)
@@ -490,7 +529,7 @@ namespace ImGui
 
 
     template<unsigned int D>
-    void Draggable3DView::bringTogether(ImVec4 pos, ImVec4 mouse_in_view_coords, std::array<float*, D> const& free_parameters, ImGuiControlPointFlags const& flags)
+    bool Draggable3DView::bringTogether(ImVec4 pos, ImVec4 mouse_in_view_coords, std::array<float*, D> const& free_parameters, ImGuiControlPointFlags const& flags)
     {
         // Minimises Q(a) = |p - Mv|^2 over a where Mv is the transformed vector, and
         // M(a) is the parametrised transformation with a the free parameter.
@@ -517,12 +556,29 @@ namespace ImGui
         for (int i = 0; i < D; ++i) {
             changes[i] = { free_parameters[i], -softening_factor * steps[i] };
         }
-        updateParameters(changes, flags);
+        return updateParameters(changes, flags);
     }
 
-    bool Draggable3DView::controlPoint(ImVec4 const& pos, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col)
+    bool Draggable3DView::staticControlPoint(ImVec4 const& pos, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col)
     {
-        return controlPoint<0>(pos, {}, flags, button_flags, marker_radius, marker_col);
+        if (!active)  // We cannot add a control point to a view that hasn't been started
+            return false;
+
+        ImVec4 transformed_pos = m_transforms.applyToVector(pos);
+        ImVec2 screen_coords = viewCoordsToScreenCoords(
+            ImVec2{ transformed_pos[0] / transformed_pos[3], transformed_pos[1] / transformed_pos[3] }
+        );
+
+        float z = transformed_pos[2] / transformed_pos[3];
+
+        // Calculate marker size in pixels, using w coord to scale the size
+        float marker_width = 2 * marker_radius;
+        if (!(flags & ImGuiControlPointFlags_SizeInPixels))
+            marker_width *= m_size.x;
+        if (!(flags & ImGuiControlPointFlags_FixedSize))
+            marker_width /= (transformed_pos.w);
+
+        return createControlPoint(screen_coords, flags, button_flags, marker_width, marker_col, z);
     }
 
     bool Draggable3DView::controlPoint(ImVec4 const& pos, float* free_param, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col)
@@ -538,6 +594,50 @@ namespace ImGui
     bool Draggable3DView::controlPoint(ImVec4 const& pos, float* free_param1, float* free_param2, float* free_param3, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col)
     {
         return controlPoint<3>(pos, { free_param1, free_param2, free_param3 }, flags, button_flags, marker_radius, marker_col);
+    }
+
+    template<unsigned int D>
+    bool Draggable3DView::controlPoint(ImVec4 const& pos, std::array<float*, D> free_parameters, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col)
+    {
+        if (!active)  // We cannot add a control point to a view that hasn't been started
+            return false;
+
+        ImVec4 transformed_pos = m_transforms.applyToVector(pos);
+        ImVec2 screen_coords = viewCoordsToScreenCoords(
+            ImVec2{ transformed_pos[0] / transformed_pos[3], transformed_pos[1] / transformed_pos[3] }
+        );
+
+        float z = transformed_pos[2] / transformed_pos[3];
+
+        // Calculate marker size in pixels, using w coord to scale the size
+        float marker_width = 2 * marker_radius;
+        if(!(flags & ImGuiControlPointFlags_SizeInPixels))
+            marker_width *= m_size.x;
+        if(!(flags & ImGuiControlPointFlags_FixedSize))
+            marker_width /= (transformed_pos.w);
+
+        bool button_result = createControlPoint(screen_coords, flags, button_flags, marker_width, marker_col, z);
+        if ((D > 0) && IsItemActive() && !IsItemActivated())
+        {
+            ImVec2 mouse_pos = getMouseInViewCoords();
+            //ImVec4 mouse_in_view_coords{ mouse_pos[0], mouse_pos[1], transformed_pos.z / transformed_pos.w, 1.0f };
+            ImVec4 mouse_in_view_coords{ mouse_pos[0], mouse_pos[1], m_saved_control_point_z_value, 1.0f };
+
+            bringTogether(pos, mouse_in_view_coords, free_parameters, flags);
+
+            if (flags & ImGuiControlPointFlags_DrawParamDerivatives)
+            {
+                // Draw tangent vector(s)
+                ProjectionTransform<float, ImVec4, 3> projection{};
+                JetDeg1<ImVec4, float*, D> jet = projection.applyStaticallyTo1Jet<D>(0,
+                    m_transforms.applyTo1Jet<D>(JetDeg1<ImVec4, float*, D>{ free_parameters, pos })
+                    );
+                ImVec2 pos{ jet.position[0], jet.position[1] };
+                for (auto const& d : jet.derivatives)
+                    drawDerivative(pos, { d[0], d[1] }, marker_col);
+            }
+        }
+        return button_result;
     }
 
     void Draggable3DView::pushMatrix(ImMat4 const& M) { m_transforms.pushMatrix(M); }
@@ -592,50 +692,6 @@ namespace ImGui
     void Draggable3DView::pushTranslationAlongZ(float* parameter) { m_transforms.pushTranslationAlongZ(parameter); }
     void Draggable3DView::pushTranslationAlongZ(float factor) { m_transforms.pushTranslationAlongZ(factor); }
 
-    template<unsigned int D>
-    bool Draggable3DView::controlPoint(ImVec4 const& pos, std::array<float*, D> free_parameters, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col)
-    {
-        if (!active)  // We cannot add a control point to a view that hasn't been started
-            return false;
-
-        ImVec4 transformed_pos = m_transforms.applyToVector(pos);
-        ImVec2 screen_coords = viewCoordsToScreenCoords(
-            ImVec2{ transformed_pos[0] / transformed_pos[3], transformed_pos[1] / transformed_pos[3] }
-        );
-
-        float z = transformed_pos[2] / transformed_pos[3];
-
-        // Calculate marker size in pixels, using w coord to scale the size
-        float marker_width = 2 * marker_radius;
-        if(!(flags & ImGuiControlPointFlags_SizeInPixels))
-            marker_width *= m_size.x;
-        if(!(flags & ImGuiControlPointFlags_FixedSize))
-            marker_width /= (transformed_pos.w);
-
-        bool result = createControlPoint(screen_coords, flags, button_flags, marker_width, marker_col, z);
-        if ((D > 0) && IsItemActive() && !IsItemActivated())
-        {
-            ImVec2 mouse_pos = getMouseInViewCoords();
-            //ImVec4 mouse_in_view_coords{ mouse_pos[0], mouse_pos[1], transformed_pos.z / transformed_pos.w, 1.0f };
-            ImVec4 mouse_in_view_coords{ mouse_pos[0], mouse_pos[1], m_saved_control_point_z_value, 1.0f };
-
-            bringTogether(pos, mouse_in_view_coords, free_parameters, flags);
-
-            if (flags & ImGuiControlPointFlags_DrawParamDerivatives)
-            {
-                // Draw tangent vector(s)
-                ProjectionTransform<float, ImVec4, 3> projection{};
-                JetDeg1<ImVec4, float*, D> jet = projection.applyStaticallyTo1Jet<D>(0,
-                    m_transforms.applyTo1Jet<D>(JetDeg1<ImVec4, float*, D>{ free_parameters, pos })
-                    );
-                ImVec2 pos{ jet.position[0], jet.position[1] };
-                for (auto const& d : jet.derivatives)
-                    drawDerivative(pos, { d[0], d[1] }, marker_col);
-            }
-        }
-        return result;
-    }
-
     Draggable3DView g_current_context{};
 
     bool BeginControlPointView(const char* name, ImVec2 const& size, ImVec4 const& border_color)
@@ -688,9 +744,9 @@ namespace ImGui
     {
         return g_current_context.controlPoint({ pos.x, pos.y, z_order, 1 }, free_parameter1, free_parameter2, free_parameter3, flags, button_flags, marker_radius, marker_col);
     }
-    bool ControlPoint(ImVec2 const& pos, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col, float z_order)
+    bool StaticControlPoint(ImVec2 const& pos, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col, float z_order)
     {
-        return g_current_context.controlPoint({ pos.x, pos.y, z_order, 1 }, flags, button_flags, marker_radius, marker_col);
+        return g_current_context.staticControlPoint({ pos.x, pos.y, z_order, 1 }, flags, button_flags, marker_radius, marker_col);
     }
 
     bool ControlPoint(ImVec4 const& pos, float* free_parameter, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col)
@@ -705,9 +761,9 @@ namespace ImGui
     {
         return g_current_context.controlPoint(pos, free_parameter1, free_parameter2, free_parameter3, flags, button_flags, marker_radius, marker_col);
     }
-    bool ControlPoint(ImVec4 const& pos, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col)
+    bool StaticControlPoint(ImVec4 const& pos, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col)
     {
-        return g_current_context.controlPoint(pos, flags, button_flags, marker_radius, marker_col);
+        return g_current_context.staticControlPoint(pos, flags, button_flags, marker_radius, marker_col);
     }
 
     void PushMatrix(ImMat4 const& M) { g_current_context.pushMatrix(M); }
@@ -768,7 +824,7 @@ namespace ImGui
         // We don't change any parameters in the control points, instead wait until the deferral slot is popped
         ImGui::PushDeferralSlot();
 
-        ImGui::ControlPoint(M->col4, control_point_flags, 0, 0.025f, { 1, 1, 1, 1 });
+        ImGui::StaticControlPoint(M->col4, control_point_flags, 0, 0.025f, { 1, 1, 1, 1 });
         ImGui::ControlPoint(*M * ImVec4{ axes_size, 0, 0, 1 }, &t.x, control_point_flags, 0, 0.025f, { 1, 0, 0, 1 });
         ImGui::ControlPoint(*M * ImVec4{ 0, axes_size, 0, 1 }, &t.y, control_point_flags, 0, 0.025f, { 0, 1, 0, 1 });
         ImGui::ControlPoint(*M * ImVec4{ 0, 0, axes_size, 1 }, &t.z, control_point_flags, 0, 0.025f, { 0, 0, 1, 1 });

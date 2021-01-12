@@ -43,12 +43,12 @@ namespace ImGui {
 	ImVec2 GetLastControlPointPosition();
 	float GetLastControlPointRadius();
 
-	bool ControlPoint(ImVec2 const& pos, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col, float z_order);
+	bool StaticControlPoint(ImVec2 const& pos, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col, float z_order);
 	bool ControlPoint(ImVec2 const& pos, float* free_parameter, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col, float z_order);
 	bool ControlPoint(ImVec2 const& pos, float* free_parameter1, float* free_parameter2, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col, float z_order);
 	bool ControlPoint(ImVec2 const& pos, float* free_parameter1, float* free_parameter2, float* free_parameter3, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col, float z_order);
 	
-	bool ControlPoint(ImVec4 const& pos, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col);
+	bool StaticControlPoint(ImVec4 const& pos, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col);
 	bool ControlPoint(ImVec4 const& pos, float* free_parameter, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col);
 	bool ControlPoint(ImVec4 const& pos, float* free_parameter1, float* free_parameter2, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col);
 	bool ControlPoint(ImVec4 const& pos, float* free_parameter1, float* free_parameter2, float* free_parameter3, ImGuiControlPointFlags flags, ImGuiButtonFlags button_flags, float marker_radius, ImVec4 marker_col);
@@ -100,7 +100,7 @@ namespace ImGui {
 		void end();
 
 		void pushDeferralSlot();
-		void popDeferralSlot();
+		bool popDeferralSlot();  // Returns true if any parameters are changed
 
 		ImVec2 getViewBoundsMin() const;
 		ImVec2 getViewBoundsMax() const;
@@ -145,14 +145,15 @@ namespace ImGui {
 		unsigned int m_deferral_stack_size{ 1 };  // Stack is never empty, there is always a slot
 		int m_deferred_step_position{ -1 };  // -1 means there is no deferred step in the stack
 
-		void updateParameters(SavedParameterChanges const& changes);
-		void updateParameters(SavedParameterChanges const& changes, ImGuiControlPointFlags const& flags);
+		bool applyParameterChanges(SavedParameterChanges const& changes);
+		bool updateParameters(SavedParameterChanges const& changes, ImGuiControlPointFlags const& flags);
 	};
 
 	class Draggable2DView : public DraggableView {
 	public:
 		ImVec2 apply(ImVec2 const& pos);
-		bool controlPoint(ImVec2 const& pos, 
+
+		bool staticControlPoint(ImVec2 const& pos, 
 			ImGuiControlPointFlags flags = 0, ImGuiButtonFlags button_flags = 0, float marker_radius = 0.1f, ImVec4 marker_col = { 1, 1, 1, 1 }, float z_order = 0);
 		bool controlPoint(ImVec2 const& pos, float* free_param,
 			ImGuiControlPointFlags flags = 0, ImGuiButtonFlags button_flags = 0, float marker_radius = 0.1f, ImVec4 marker_col = { 1, 1, 1, 1 }, float z_order = 0);
@@ -190,13 +191,14 @@ namespace ImGui {
 		Parametrised2dTransformContext<float, ImVec2, ImMat2> m_transforms{};
 
 		template<unsigned int D>
-		void bringTogether(ImVec2 pos, ImVec2 mouse_in_view_coords, std::array<float*, D> const& free_parameters, ImGuiControlPointFlags const& flags);
+		bool bringTogether(ImVec2 pos, ImVec2 mouse_in_view_coords, std::array<float*, D> const& free_parameters, ImGuiControlPointFlags const& flags);
 	};
 
 	class Draggable3DView : public DraggableView {
 	public:
-		ImVec2 apply(ImVec4 const& pos);
-		bool controlPoint(ImVec4 const& pos, 
+		ImVec2 apply(ImVec4 const& pos); 
+		
+		bool staticControlPoint(ImVec4 const& pos, 
 			ImGuiControlPointFlags flags = 0, ImGuiButtonFlags button_flags = 0, float marker_radius = 0.1f, ImVec4 marker_col = { 1, 1, 1, 1 });
 		bool controlPoint(ImVec4 const& pos, float* free_param, 
 			ImGuiControlPointFlags flags = 0, ImGuiButtonFlags button_flags = 0, float marker_radius = 0.1f, ImVec4 marker_col = { 1, 1, 1, 1 });
@@ -248,7 +250,7 @@ namespace ImGui {
 		ParametrisedProjective3dTransformContext<float, ImVec4, ImMat4> m_transforms{};
 
 		template<unsigned int D>
-		void bringTogether(ImVec4 pos, ImVec4 mouse_in_view_coords, std::array<float*, D> const& free_parameters, ImGuiControlPointFlags const& flags);
+		bool bringTogether(ImVec4 pos, ImVec4 mouse_in_view_coords, std::array<float*, D> const& free_parameters, ImGuiControlPointFlags const& flags);
 	};
 
 
