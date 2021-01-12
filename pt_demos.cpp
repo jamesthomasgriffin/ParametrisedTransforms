@@ -122,7 +122,7 @@ void ShowSpiralDemo(bool* p_open)
         );
 
         auto draw_list = ImGui::GetWindowDrawList();
-        ImGui::ControlPoint({ 1.0, 0.0, 0.0, 1.0 }, 0, 0, 0.05f, ImVec4{ 0, 1, 1, 1 });
+        ImGui::StaticControlPoint({ 1.0, 0.0, 0.0, 1.0 }, 0, 0, 0.05f, ImVec4{ 0, 1, 1, 1 });
         ImVec2 prev_point = ImGui::GetLastControlPointPosition();
 
         ImGuiControlPointFlags flags = 0;
@@ -180,7 +180,7 @@ void ShowArmDemo(bool* p_open)
     ImGui::PushTranslationAlongY(-0.5f);
     ImGui::PushRotationAboutY(&base_rotation);
     ImGui::ControlPoint({ 0.2f, 0, 0, 1.0f }, &base_rotation, flags, 0, 0.0375f, { 1, 0, 1, 1 });
-    ImGui::ControlPoint({ 0.0f, 0, 0, 1.0f }, flags, 0, 0.025f, { 1, 1, 1, 1 });
+    ImGui::StaticControlPoint({ 0.0f, 0, 0, 1.0f }, flags, 0, 0.025f, { 1, 1, 1, 1 });
     ImGui::PushRotationAboutZ(&base_angle);
     ImGui::PushTranslationAlongY(0.5f);
     ImGui::ControlPoint({ 0.0f, -0.1f, 0, 1.0f }, &base_angle, flags, 0, 0.025f, { 1, 1, 1, 1 });
@@ -282,7 +282,7 @@ void ShowCameraDemo(bool* p_open)
         view.controlPoint({ 0.0f, 1.0f, 0.0f, 1.0f }, &camera_vertical_angle, flags, 0, 0.05f, { 1, 0, 0, 1 });
         view.controlPoint({ 0.0f, 0.0f, 1.0f, 1.0f }, &camera_vertical_angle, flags, 0, 0.05f, { 1, 0, 0, 1 });
         view.controlPoint({ 1.0f, 1.0f, 1.0f, 1.0f }, &camera_distance, flags, 0, 0.05f, { 1, 1, 1, 1 });
-        view.controlPoint({ 0.0f, 0.0f, 0.0f, 1.0f }, flags, 0, 0.05f, { 1, 1, 0, 1 });
+        view.staticControlPoint({ 0.0f, 0.0f, 0.0f, 1.0f }, flags, 0, 0.05f, { 1, 1, 0, 1 });
 
         view.end();
     }
