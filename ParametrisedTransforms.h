@@ -652,7 +652,7 @@ public:
 	virtual out_vector_t dt2(scalar_t t, in_vector_t const& p) const { return out_vector_t{}; }
 };
 
-// Scales but along only one coordiate 
+// Scales but along only one coordinate 
 template<typename S, typename V, unsigned int axis>
 class ScaleAlongAxisTransform : public MatrixFamilyOfSimpleTransforms<S, V, V>
 {
@@ -1020,8 +1020,8 @@ struct ParametrisedProjective3dTransformContext : public ParametrisedTransformCo
 	using P = scalar_t*;
 	using matrix_t = M;
 
-	void pushScale(P parameter) { pushSingleParameterTransformation<ScaleTransform<scalar_t, vector_t>>(parameter); }
-	void pushScale(scalar_t factor) { pushStaticTransformation<ScaleTransform<scalar_t, vector_t>>(factor); }
+	void pushScale(P parameter) { pushSingleParameterTransformation<ProjectiveScaleTransform<scalar_t, vector_t, 3>>(parameter); }
+	void pushScale(scalar_t factor) { pushStaticTransformation<ProjectiveScaleTransform<scalar_t, vector_t, 3>>(factor); }
 
 	void pushTranslation(P parameter, vector_t v) { pushSingleParameterTransformationWithArgument<SkewDirectionTransform<scalar_t, vector_t, 3>, vector_t>(parameter, v); }
 	void pushTranslation(scalar_t value, vector_t v) { pushStaticTransformationWithArgument<SkewDirectionTransform<scalar_t, vector_t, 3>, vector_t>(value, v); }
