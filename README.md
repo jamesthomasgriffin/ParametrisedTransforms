@@ -1,3 +1,7 @@
+# NB
+
+I thought this was neat enough to develop further, so have started from scratch with a different model for the transformation stack and a different focus, only on matrix transformations.  The new code is far more efficient and will be available soon, it will be called ImControl.
+
 # ParametrisedTransforms
 
 A small template header library for parametrised transforms, with examples for Dear ImGui.
